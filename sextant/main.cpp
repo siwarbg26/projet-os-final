@@ -24,6 +24,7 @@
 #include <drivers/EcranBochs.h>
 
 #include <sextant/sprite.h>
+#include <sextant/sprites_breakout.h>
 #include <Games/Breakout/BreakoutGame.h>
 #include <drivers/PortSerie.h>
 
@@ -206,7 +207,10 @@ void simple_breakout()
 	{
 		for (int col = 0; col < 6; col++)
 		{
-			bricks[row * 6 + col].x = 30 + col * 105;
+			// Mieux espacées pour tenir dans l'écran (640 pixels)
+			// 6 briques de 90 pixels + espacements = 540 + 20 = 560 pixels
+			// Centré: (640-560)/2 = 40 pixels de margin
+			bricks[row * 6 + col].x = 40 + col * 100;
 			bricks[row * 6 + col].y = 80 + row * 35;
 			bricks[row * 6 + col].destroyed = false;
 		}
@@ -215,8 +219,10 @@ void simple_breakout()
 	Clavier keyboard;
 	int frame_counter = 0;
 	int keyboard_counter = 0; // Compteur pour lire le clavier moins souvent
+	bool game_over = false;
+	bool you_win = false;
 
-	while (1)
+	while (!game_over && !you_win)
 	{
 		// Effacer l'écran
 		vga.clear(bg_r, bg_g, bg_b);
@@ -239,20 +245,26 @@ void simple_breakout()
 		if (ball_x > paddle2_x + 100 && paddle2_x < 540)
 			paddle2_x += 2;
 
-		// Mouvement de la balle (ralenti)
+		// Mouvement de la balle (accéléré)
 		frame_counter++;
-		if (frame_counter > 5)
+		if (frame_counter > 2)
 		{
 			ball_x += ball_dx;
 			ball_y += ball_dy;
 			frame_counter = 0;
 		}
 
-		// Rebond sur les murs gauche/droit - CLAMP pour éviter de sortir
+		// Rebond sur les murs GAUCHE/DROIT - CLAMP pour éviter de sortir
 		if (ball_x <= 10)
 			ball_dx = 1;
 		if (ball_x >= 630)
 			ball_dx = -1;
+
+		// GAME OVER si la balle sort par le haut ou le bas
+		if (ball_y < 0 || ball_y > 400)
+		{
+			game_over = true;
+		}
 
 		// Rebond sur paddle 1 (haut)
 		if (ball_y <= paddle1_y + 20 && ball_x > paddle1_x && ball_x < paddle1_x + 100)
@@ -275,70 +287,68 @@ void simple_breakout()
 			{
 				int bx = bricks[i].x;
 				int by = bricks[i].y;
-				if (ball_x > bx && ball_x < bx + 90 && ball_y > by && ball_y < by + 25)
+				// Rayon de collision de la balle = 10 pixels (pour plus de facilité)
+				// Vérifier si la balle touche la brique
+				int ball_radius = 10;
+				if (ball_x + ball_radius > bx && ball_x - ball_radius < bx + 90 &&
+					ball_y + ball_radius > by && ball_y - ball_radius < by + 25)
 				{
 					bricks[i].destroyed = true;
 					ball_dy = -ball_dy;
 					score += 10;
 				}
 			}
-		} // Réinitialiser si la balle sort
-		if (ball_y < 0 || ball_y > 400)
-		{
-			ball_x = 320;
-			ball_y = 200;
-			ball_dx = 1;
-			ball_dy = 1;
 		}
 
-		// Dessiner les éléments du jeu
-		// Paddle 1 (raquette du haut) - rectangle
-		for (int x = paddle1_x; x < paddle1_x + 100; x++)
+		// Vérifier si toutes les briques sont cassées
+		bool all_destroyed = true;
+		for (int i = 0; i < 12; i++)
 		{
-			for (int y = paddle1_y; y < paddle1_y + 10; y++)
+			if (!bricks[i].destroyed)
 			{
-				vga.paint(x, y, paddle_r, paddle_g, paddle_b);
+				all_destroyed = false;
+				break;
 			}
+		}
+		if (all_destroyed)
+		{
+			you_win = true;
 		}
 
-		// Paddle 2 (raquette du bas) - rectangle
-		for (int x = paddle2_x; x < paddle2_x + 100; x++)
-		{
-			for (int y = paddle2_y; y < paddle2_y + 10; y++)
-			{
-				vga.paint(x, y, paddle_r, paddle_g, paddle_b);
-			}
-		}
+		// Dessiner les éléments du jeu avec sprites
+		// Paddle 1 (raquette du haut)
+		draw_paddle(vga, paddle1_x, paddle1_y, 100, 10, paddle_r, paddle_g, paddle_b);
 
-		// Balle - cercle simple
-		for (int dx = -5; dx <= 5; dx++)
-		{
-			for (int dy = -5; dy <= 5; dy++)
-			{
-				if (dx * dx + dy * dy <= 25)
-				{
-					vga.paint(ball_x + dx, ball_y + dy, ball_r, ball_g, ball_b);
-				}
-			}
-		}
+		// Paddle 2 (raquette du bas)
+		draw_paddle(vga, paddle2_x, paddle2_y, 100, 10, paddle_r, paddle_g, paddle_b);
+
+		// Balle
+		draw_ball(vga, ball_x, ball_y, 5, ball_r, ball_g, ball_b);
 
 		// Briques - SEULEMENT LES BRIQUES NON DÉTRUITES
 		for (int i = 0; i < 12; i++)
 		{
 			if (!bricks[i].destroyed)
 			{
-				int bx = bricks[i].x;
-				int by = bricks[i].y;
-				for (int x = bx; x < bx + 90; x++)
-				{
-					for (int y = by; y < by + 25; y++)
-					{
-						vga.paint(x, y, brick_r, brick_g, brick_b);
-					}
-				}
+				draw_brick(vga, bricks[i].x, bricks[i].y, 90, 25, brick_r, brick_g, brick_b);
 			}
 		}
 
+		vga.swapBuffer();
+	}
+
+	// Afficher l'écran de fin
+	while (1)
+	{
+		vga.clear(bg_r, bg_g, bg_b);
+		if (you_win)
+		{
+			draw_you_win(vga, score);
+		}
+		else
+		{
+			draw_game_over(vga, score);
+		}
 		vga.swapBuffer();
 	}
 }
