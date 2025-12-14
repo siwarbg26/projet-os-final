@@ -189,10 +189,10 @@ void simple_breakout()
 	vga.init();
 
 	// Positions et dimensions
-	int paddle1_x = 250, paddle1_y = 20;
-	int paddle2_x = 250, paddle2_y = 370;
+	int paddle1_x = 250, paddle1_y = 370; // Paddle joueur EN BAS
+	int paddle2_x = 250, paddle2_y = 20;  // Paddle IA EN HAUT
 	int ball_x = 320, ball_y = 200;
-	int ball_dx = 1, ball_dy = 1;
+	int ball_dx = 1, ball_dy = -1; // Commence par aller VERS LE HAUT
 	int score = 0;
 
 	// Couleurs RGB
@@ -266,17 +266,17 @@ void simple_breakout()
 			game_over = true;
 		}
 
-		// Rebond sur paddle 1 (haut)
-		if (ball_y <= paddle1_y + 20 && ball_x > paddle1_x && ball_x < paddle1_x + 100)
+		// Rebond sur paddle 1 (EN BAS - joueur)
+		if (ball_y >= paddle1_y - 20 && ball_x > paddle1_x && ball_x < paddle1_x + 100)
 		{
-			ball_dy = 1;
+			ball_dy = -2; // Forte vitesse vers le haut
 			score++;
 		}
 
-		// Rebond sur paddle 2 (bas)
-		if (ball_y >= paddle2_y - 20 && ball_x > paddle2_x && ball_x < paddle2_x + 100)
+		// Rebond sur paddle 2 (EN HAUT - IA)
+		if (ball_y <= paddle2_y + 20 && ball_x > paddle2_x && ball_x < paddle2_x + 100)
 		{
-			ball_dy = -1;
+			ball_dy = 2; // Forte vitesse vers le bas
 			score++;
 		}
 
